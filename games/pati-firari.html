@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Pati Firarı — Kedi Kaçış Oyunu</title>
+<style>
+  :root{
+    --bg:#1b1720; --panel:#2a2330; --ink:#f4eadb; --muted:#b9a99a;
+    --accent:#f0a04b; --accent-2:#ffcf8a; --danger:#ff5a4f; --ok:#7fd68c;
+    --font:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);overflow:hidden;
+    -webkit-user-select:none;user-select:none;touch-action:none}
+  #app{display:flex;flex-direction:column;align-items:center;height:100%}
+  #hud{width:100%;height:56px;display:flex;align-items:center;justify-content:center;gap:22px;
+    padding:0 16px;font-size:15px;letter-spacing:.02em;background:linear-gradient(#241e2a,#1b1720)}
+  .hud-item{display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .hud-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+  .hud-val{font-weight:700;font-variant-numeric:tabular-nums}
+  .bells{display:flex;gap:5px}
+  .bell{width:14px;height:14px;border-radius:50%;border:2px solid #6b5d70;background:transparent}
+  .bell.on{background:var(--danger);border-color:var(--danger);box-shadow:0 0 8px var(--danger)}
+  #mode.sneak{color:var(--ok)}
+  #stage{position:relative;flex:1;width:100%;display:flex;align-items:center;justify-content:center}
+  canvas{display:block;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(16,12,20,.72);backdrop-filter:blur(2px)}
+  .screen.hidden{display:none}
+  .card{background:var(--panel);border:1px solid #43384b;border-radius:16px;padding:28px 34px;
+    max-width:560px;width:calc(100% - 32px);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .card h1{font-size:44px;color:var(--accent);letter-spacing:.02em;line-height:1.05}
+  .card h2{font-size:30px;margin-bottom:6px}
+  .card p{color:var(--muted);line-height:1.5;margin:10px 0}
+  .card .lead{color:var(--ink);font-size:16px}
+  .rules{text-align:left;margin:16px 0;display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:14px}
+  .rules b{color:var(--accent-2);white-space:nowrap}
+  .rules span{color:var(--ink)}
+  .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+  button{font-family:var(--font);font-size:16px;font-weight:700;border:none;border-radius:10px;
+    padding:12px 22px;cursor:pointer;background:var(--accent);color:#2a1a0b;transition:transform .08s,filter .15s}
+  button:hover{filter:brightness(1.08)} button:active{transform:scale(.97)}
+  button:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+  button.ghost{background:#3b3242;color:var(--ink)}
+  .stars{font-size:40px;letter-spacing:6px;margin:8px 0;color:#5a4e60}
+  .stars .s{color:#ffd166;text-shadow:0 0 12px rgba(255,209,102,.6)}
+  .stats{display:flex;justify-content:center;gap:24px;margin-top:6px;font-size:15px}
+  .stats div{display:flex;flex-direction:column;gap:2px}
+  .stats small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
+  #menuCat{display:block;margin:0 auto 6px;box-shadow:none;border-radius:0}
+  #touch{position:fixed;inset:auto 0 0 0;height:190px;pointer-events:none;display:none}
+  #touch.show{display:block}
+  #joy{position:absolute;left:24px;bottom:24px;width:140px;height:140px;border-radius:50%;
+    background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);pointer-events:auto}
+  #knob{position:absolute;left:45px;top:45px;width:50px;height:50px;border-radius:50%;background:rgba(240,160,75,.75)}
+  #sneakBtn{position:absolute;right:24px;bottom:44px;width:96px;height:96px;border-radius:50%;
+    pointer-events:auto;background:rgba(255,255,255,.1);color:var(--ink);border:2px solid rgba(255,255,255,.25);font-size:14px}
+  #sneakBtn.on{background:rgba(127,214,140,.5)}
+  #pauseBtn{position:absolute;right:12px;top:12px;pointer-events:auto;padding:8px 12px;font-size:14px}
+  @media (max-width:720px){#hud{gap:10px;font-size:12px;padding:0 8px}#hSound{display:none}#hud .hud-item:first-child .hud-val{max-width:120px;overflow:hidden;text-overflow:ellipsis}.hud-label{display:none}.card h1{font-size:34px}.card{padding:20px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-item"><span class="hud-label">Bölüm</span><span class="hud-val" id="hLevel">1</span></div>
+    <div class="hud-item"><span class="hud-label">Balık</span><span class="hud-val" id="hFish">0/0</span></div>
+    <div class="hud-item"><span class="hud-label">Alarm</span><div class="bells" id="hBells"></div></div>
+    <div class="hud-item"><span class="hud-label">Süre</span><span class="hud-val" id="hTime">0:00</span></div>
+    <div class="hud-item"><span class="hud-val" id="mode">Normal</span></div>
+    <div class="hud-item"><span class="hud-val" id="hSound" style="color:var(--muted);font-weight:400">Ses: Açık (M)</span></div>
+  </div>
+  <div id="stage">
+    <canvas id="game" aria-label="Pati Firarı oyun alanı"></canvas>
+    <div id="overlay" class="screen"></div>
+  </div>
+</div>
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <button id="sneakBtn">Sinsi</button>
+</div>
+
+<script>
+'use strict';
+// ================= SABİTLER =================
+const T = 32, COLS = 30, ROWS = 20, W = COLS * T, H = ROWS * T;
+const MAX_ALARMS = 3;
+const CAT_SPEED = 128, SNEAK_SPEED = 60, CAT_R = 9, OWNER_R = 11;
+const NOISE_R = 3.6 * T;
+
+// '#' duvar, '.' parke, ',' fayans, '_' halı, 'E' çıkış
+const LEVELS = [
+  {
+    name: 'Yatak Odası', sub: 'Sahibin salonda dolaşıyor. Sessizce sağdaki kapıya ulaş.',
+    wood: '#a7784b', carpet: '#6f5f86', tile: ['#d8d2c4', '#c7c0b0'],
+    map: [
+      '##############################',
+      '#_______#....................#',
+      '#_______#....................#',
+      '#_______#....................#',
+      '#_______#.........#..........#',
+      '#_______#.........#..........#',
+      '#_________........#..........#',
+      '#_________........#..........#',
+      '#_______#.........#..........#',
+      '#_______#.........#..........E',
+      '#_______#.........#..........E',
+      '#_______#....................#',
+      '#_______#....................#',
+      '####,####....................#',
+      '#,,,,,,,#....................#',
+      '#,,,,,,,#....................#',
+      '#,,,,,,,#....................#',
+      '#,,,,,,,#....................#',
+      '#,,,,,,,#....................#',
+      '##############################',
+    ],
+    furniture: [
+      { t: 'bed', x: 1, y: 1, w: 3, h: 4 }, { t: 'wardrobe', x: 5, y: 1, w: 3, h: 1 },
+      { t: 'rug', x: 2, y: 7, w: 4, h: 3 }, { t: 'plant', x: 7, y: 12, w: 1, h: 1 },
+      { t: 'tub', x: 1, y: 16, w: 2, h: 3 }, { t: 'sink', x: 6, y: 14, w: 2, h: 1 },
+      { t: 'rug', x: 10, y: 10, w: 5, h: 7 }, { t: 'sofa', x: 10, y: 15, w: 4, h: 2 },
+      { t: 'table', x: 11, y: 11, w: 3, h: 2 }, { t: 'shelf', x: 22, y: 1, w: 4, h: 1 },
+      { t: 'table', x: 22, y: 14, w: 3, h: 2 }, { t: 'plant', x: 28, y: 1, w: 1, h: 1 },
+      { t: 'plant', x: 28, y: 18, w: 1, h: 1 }, { t: 'armchair', x: 19, y: 1, w: 2, h: 2 },
+    ],
+    cat: [5, 5],
+    owner: { speed: 1.0, wps: [[15, 3], [26, 3], [26, 16], [16, 17], [15, 8]] },
+    cams: [{ x: 28.6, y: 8.2, a: Math.PI, sweep: 0.55, speed: 0.7, range: 8, fov: 0.7 }],
+    lasers: [],
+    fish: [[4, 16], [21, 4], [27, 16]],
+  },
+  {
+    name: 'Mutfak ve Koridor', sub: 'Lazerler yanıp sönüyor. Kapalıyken geç, kameraya görünme.',
+    wood: '#9b6d43', carpet: '#7a4a4a', tile: ['#e2dccd', '#b9c4c6'],
+    map: [
+      '##############################',
+      '#,,,,,,,,,,,,#...............#',
+      '#,,,,,,,,,,,,#...............#',
+      '#,,,,,,,,,,,,#...............#',
+      '#,,,,,,,,,,,,#...............#',
+      '#,,,,,,,,,,,,,...............#',
+      '#,,,,,,,,,,,,,...............#',
+      '#,,,,,,,,,,,,#...............#',
+      '#,,,,,,,,,,,,#...............#',
+      '#######,,#######.....#########',
+      '#____________________________#',
+      '#____________________________#',
+      '#____________________________#',
+      '##########__##########__######',
+      '#.............#..............#',
+      '#.............#..............#',
+      '#.............#..............#',
+      '#.............#..............#',
+      '#.............#..............#',
+      '########################EE####',
+    ],
+    furniture: [
+      { t: 'counter', x: 1, y: 1, w: 7, h: 1 }, { t: 'fridge', x: 9, y: 1, w: 2, h: 2 },
+      { t: 'table', x: 4, y: 4, w: 3, h: 2 }, { t: 'plant', x: 12, y: 8, w: 1, h: 1 },
+      { t: 'desk', x: 16, y: 1, w: 4, h: 2 }, { t: 'shelf', x: 24, y: 1, w: 5, h: 1 },
+      { t: 'armchair', x: 25, y: 4, w: 2, h: 2 }, { t: 'plant', x: 14, y: 1, w: 1, h: 1 },
+      { t: 'plant', x: 1, y: 10, w: 1, h: 1 },
+      { t: 'washer', x: 1, y: 14, w: 2, h: 1 }, { t: 'washer', x: 3, y: 14, w: 2, h: 1 },
+      { t: 'basket', x: 10, y: 16, w: 2, h: 2 }, { t: 'rug', x: 3, y: 16, w: 5, h: 2 },
+      { t: 'bench', x: 16, y: 17, w: 4, h: 1 }, { t: 'plant', x: 28, y: 14, w: 1, h: 1 },
+      { t: 'shelf', x: 26, y: 18, w: 3, h: 1 }, { t: 'rug', x: 22, y: 16, w: 4, h: 2 },
+    ],
+    cat: [2, 7],
+    owner: { speed: 1.05, wps: [[15, 6], [27, 7], [27, 11], [5, 11], [18, 8]] },
+    cams: [
+      { x: 28.6, y: 11.5, a: Math.PI, sweep: 0.45, speed: 0.8, range: 9, fov: 0.6 },
+      { x: 15.4, y: 14.4, a: Math.PI / 4, sweep: 0.6, speed: 0.6, range: 7, fov: 0.7 },
+    ],
+    lasers: [
+      { x1: 18.5, y1: 10, x2: 18.5, y2: 13, on: 2.0, off: 1.7, phase: 0 },
+      { x1: 22, y1: 13.5, x2: 24, y2: 13.5, on: 1.4, off: 1.6, phase: 0.8 },
+    ],
+    fish: [[12, 3], [27, 2], [6, 18], [21, 15]],
+  },
+  {
+    name: 'Giriş Holü', sub: 'Son engel. Sütunların arkasına saklan ve kedi kapısına koş.',
+    wood: '#8e6a4a', carpet: '#3f5a5a', tile: ['#d6d0c2', '#c4bdac'],
+    map: [
+      '##############################',
+      '#......#______________#......#',
+      '#......#______________#......#',
+      '#......#___##____##___#......#',
+      '#.......___##____##___#......#',
+      '#......#___##____##___#......#',
+      '#......#_______________......#',
+      '#......#______________#......#',
+      '####.###______________###.####',
+      '#......#______________#......#',
+      '#......#______________#......#',
+      '#......#___##____##___#......#',
+      '#.......___##____##____......#',
+      '#......#___##____##___#......#',
+      '#......#______________#......#',
+      '#......#______________#......#',
+      '#......#______________#......#',
+      '#......#______________#......#',
+      '#......#______________#......#',
+      '##############EE##############',
+    ],
+    furniture: [
+      { t: 'bed', x: 1, y: 1, w: 2, h: 3 }, { t: 'wardrobe', x: 4, y: 1, w: 3, h: 1 },
+      { t: 'shelf', x: 1, y: 9, w: 3, h: 1 }, { t: 'sofa', x: 1, y: 14, w: 2, h: 3 },
+      { t: 'table', x: 3, y: 11, w: 2, h: 2 }, { t: 'plant', x: 6, y: 18, w: 1, h: 1 },
+      { t: 'desk', x: 25, y: 1, w: 3, h: 2 }, { t: 'plant', x: 28, y: 7, w: 1, h: 1 },
+      { t: 'armchair', x: 26, y: 14, w: 2, h: 2 }, { t: 'shelf', x: 23, y: 18, w: 4, h: 1 },
+      { t: 'rug', x: 9, y: 7, w: 12, h: 3 }, { t: 'table', x: 13, y: 15, w: 4, h: 1 },
+      { t: 'plant', x: 8, y: 18, w: 1, h: 1 },
+    ],
+    cat: [3, 5],
+    owner: { speed: 1.12, wps: [[9, 2], [20, 2], [20, 17], [9, 17], [15, 8]] },
+    cams: [
+      { x: 8.4, y: 1.4, a: Math.PI / 4 + 0.15, sweep: 0.6, speed: 0.6, range: 9, fov: 0.6 },
+      { x: 21.6, y: 1.4, a: 3 * Math.PI / 4 - 0.15, sweep: 0.6, speed: 0.55, range: 9, fov: 0.6 },
+      { x: 21.6, y: 18.6, a: -3 * Math.PI / 4, sweep: 0.5, speed: 0.7, range: 8, fov: 0.6 },
+    ],
+    lasers: [
+      { x1: 8, y1: 16.5, x2: 22, y2: 16.5, on: 2.2, off: 1.6, phase: 0 },
+      { x1: 8, y1: 9.5, x2: 22, y2: 9.5, on: 1.6, off: 1.8, phase: 1.0 },
+      { x1: 7.5, y1: 12, x2: 7.5, y2: 13, on: 1.0, off: 1.3, phase: 0.3 },
+    ],
+    fish: [[2, 17], [27, 4], [27, 17], [15, 6]],
+  },
+];
+
+const FTYPE = {
+  bed: 'hide', sofa: 'hide', table: 'hide', desk: 'hide', basket: 'hide', bench: 'hide', armchair: 'hide',
+  wardrobe: 'tall', shelf: 'tall', fridge: 'tall', counter: 'tall', washer: 'tall',
+  plant: 'low', tub: 'low', sink: 'low', rug: 'decor',
+};
+
+// ================= YARDIMCILAR =================
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
+function angDiff(a, b) { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
+function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); }
+function segPointDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+  let t = l2 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0; t = clamp(t, 0, 1);
+  return dist(px, py, x1 + t * dx, y1 + t * dy);
+}
+
+// ================= SES (Web Audio, harici dosya yok) =================
+const Sound = {
+  ctx: null, master: null, music: null, sfx: null, muted: false, noiseBuf: null, mstep: 0, nextT: 0, timer: null,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const c = this.ctx = new AC();
+    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.7; this.master.connect(c.destination);
+    this.music = c.createGain(); this.music.gain.value = 0.28; this.music.connect(this.master);
+    this.sfx = c.createGain(); this.sfx.gain.value = 0.8; this.sfx.connect(this.master);
+    const b = c.createBuffer(1, c.sampleRate * 0.5, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    this.noiseBuf = b;
+    this.nextT = c.currentTime + 0.1;
+    this.timer = setInterval(() => this.schedule(), 30);
+  },
+  toggleMute() { this.muted = !this.muted; if (this.master) this.master.gain.value = this.muted ? 0 : 0.7; },
+  tone(f, dur, o = {}) {
+    if (!this.ctx) return; const c = this.ctx, t = (o.at || c.currentTime) + (o.delay || 0);
+    const osc = c.createOscillator(), g = c.createGain();
+    osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(f, t);
+    if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t + dur);
+    const v = o.vol ?? 0.2;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + (o.attack || 0.01));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(o.dest || this.sfx); osc.start(t); osc.stop(t + dur + 0.05);
+  },
+  noise(dur, vol, freq, o = {}) {
+    if (!this.ctx) return; const c = this.ctx, t = (o.at || c.currentTime);
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const f = c.createBiquadFilter(); f.type = o.ftype || 'bandpass'; f.frequency.value = freq; f.Q.value = o.q || 1;
+    const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(o.dest || this.sfx); s.start(t); s.stop(t + dur + 0.02);
+  },
+  meow() {
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(480, t); o.frequency.linearRampToValueAtTime(820, t + 0.14); o.frequency.linearRampToValueAtTime(430, t + 0.5);
+    f.type = 'bandpass'; f.frequency.setValueAtTime(900, t); f.frequency.linearRampToValueAtTime(1600, t + 0.15); f.frequency.linearRampToValueAtTime(800, t + 0.5); f.Q.value = 4;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(f); f.connect(g); g.connect(this.sfx); o.start(t); o.stop(t + 0.6);
+  },
+  fish() { [988, 1319, 1760].forEach((f, i) => this.tone(f, 0.18, { delay: i * 0.06, vol: 0.15, type: 'triangle' })); },
+  step() { this.noise(0.05, 0.05, 500, { q: 2 }); },
+  siren(hi) { this.tone(hi ? 920 : 690, 0.24, { type: 'square', vol: 0.09 }); },
+  beep(p) { this.tone(500 + p * 700, 0.06, { type: 'square', vol: 0.05 }); },
+  huh() { this.tone(220, 0.25, { type: 'triangle', vol: 0.18, slide: 330 }); },
+  zap() { this.tone(1500, 0.2, { type: 'sawtooth', vol: 0.08, slide: 200 }); },
+  lose() { [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.35, { delay: i * 0.22, type: 'triangle', vol: 0.2 })); },
+  win() { [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, 0.3, { delay: i * 0.1, type: 'triangle', vol: 0.18 })); },
+  // Sinsi arka plan müziği: pizzicato bas + hafif zil
+  schedule() {
+    const c = this.ctx; if (!c) return;
+    const bass = [110, 0, 82.4, 0, 110, 130.8, 123.5, 0, 110, 0, 82.4, 0, 98, 0, 103.8, 0];
+    const mel = [0, 0, 0, 0, 659, 0, 0, 622, 0, 0, 587, 0, 0, 0, 0, 0];
+    const tense = game && game.alarmT > 0;
+    const stepDur = tense ? 0.2 : 0.3;
+    while (this.nextT < c.currentTime + 0.12) {
+      const s = this.mstep % 16, bar = Math.floor(this.mstep / 16) % 4;
+      if (game && (game.state === 'playing' || game.state === 'menu')) {
+        if (bass[s]) this.tone(bass[s] * (bar === 3 ? 1.122 : 1), 0.25, { at: this.nextT, type: 'triangle', vol: 0.5, dest: this.music });
+        if (s % 2 === 1) this.noise(0.03, 0.06, 7000, { at: this.nextT, ftype: 'highpass', dest: this.music });
+        if (mel[s] && bar % 2 === 1) this.tone(mel[s], 0.5, { at: this.nextT, type: 'sine', vol: 0.12, dest: this.music });
+      }
+      this.nextT += stepDur; this.mstep++;
+    }
+  },
+};
+
+// ================= GİRDİ =================
+const keys = {};
+const touchVec = { x: 0, y: 0 }; let touchSneak = false;
+addEventListener('keydown', e => {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if (!keys[e.code]) onPress(e.code);
+  keys[e.code] = true;
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (game.state === 'playing') pauseGame(); });
+
+function onPress(code) {
+  Sound.init();
+  if (code === 'KeyM') { Sound.toggleMute(); updateSoundLabel(); }
+  if (code === 'KeyF') game.debug = !game.debug;
+  if ((code === 'KeyP' || code === 'Escape')) { if (game.state === 'playing') pauseGame(); else if (game.state === 'paused') resumeGame(); }
+  if (code === 'KeyR' && (game.state === 'playing' || game.state === 'paused' || game.state === 'lose')) startLevel(game.level);
+  if (code === 'Enter' || code === 'Space') { const b = overlay.querySelector('button[data-primary]'); if (b && !overlay.classList.contains('hidden')) b.click(); }
+}
+function inputVec() {
+  let x = 0, y = 0;
+  if (keys.KeyA || keys.ArrowLeft) x -= 1; if (keys.KeyD || keys.ArrowRight) x += 1;
+  if (keys.KeyW || keys.ArrowUp) y -= 1; if (keys.KeyS || keys.ArrowDown) y += 1;
+  x += touchVec.x; y += touchVec.y;
+  const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+  return { x, y, sneak: !!(keys.ShiftLeft || keys.ShiftRight) || touchSneak };
+}
+
+// Dokunmatik kontroller
+const touchEl = document.getElementById('touch'), joy = document.getElementById('joy'), knob = document.getElementById('knob'), sneakBtn = document.getElementById('sneakBtn');
+if (matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) touchEl.classList.add('show');
+let joyId = null;
+joy.addEventListener('pointerdown', e => { joyId = e.pointerId; joy.setPointerCapture(e.pointerId); moveJoy(e); Sound.init(); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === joyId) moveJoy(e); });
+const endJoy = e => { if (e.pointerId !== joyId) return; joyId = null; touchVec.x = touchVec.y = 0; knob.style.transform = ''; };
+joy.addEventListener('pointerup', endJoy); joy.addEventListener('pointercancel', endJoy);
+function moveJoy(e) {
+  const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const l = Math.hypot(dx, dy), m = 50; if (l > m) { dx = dx / l * m; dy = dy / l * m; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`; touchVec.x = dx / m; touchVec.y = dy / m;
+}
+sneakBtn.addEventListener('pointerdown', e => { e.preventDefault(); touchSneak = !touchSneak; sneakBtn.classList.toggle('on', touchSneak); Sound.init(); });
+
+// ================= OYUN DURUMU =================
+const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+let viewScale = 1;
+const game = {
+  state: 'menu', level: 0, time: 0, alarms: 0, alarmT: 0, sirenT: 0, fishGot: 0, fishTotal: 0, debug: false,
+  cat: null, owner: null, cams: [], lasers: [], fish: [], rings: [], particles: [], banner: 0, shake: 0, totalStars: [0, 0, 0], fps: 60,
+};
+let grid, catBlock, ownerBlock, visBlock, hideRects, staticLayer, hideLayer, vignette;
+
+function tileAt(c, r) { if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return '#'; return grid[r][c]; }
+
+function buildLevel(i) {
+  const L = LEVELS[i];
+  grid = L.map;
+  catBlock = []; ownerBlock = []; visBlock = [];
+  for (let r = 0; r < ROWS; r++) {
+    catBlock.push([]); ownerBlock.push([]); visBlock.push([]);
+    for (let c = 0; c < COLS; c++) {
+      const w = grid[r][c] === '#';
+      catBlock[r][c] = w; visBlock[r][c] = w; ownerBlock[r][c] = w || grid[r][c] === 'E';
+    }
+  }
+  hideRects = [];
+  for (const f of L.furniture) {
+    const k = FTYPE[f.t]; if (k === 'decor') continue;
+    for (let r = f.y; r < f.y + f.h; r++) for (let c = f.x; c < f.x + f.w; c++) {
+      ownerBlock[r][c] = true;
+      if (k === 'tall' || k === 'low') catBlock[r][c] = true;
+      if (k === 'tall') visBlock[r][c] = true;
+    }
+    if (k === 'hide') hideRects.push({ x: f.x * T, y: f.y * T, w: f.w * T, h: f.h * T, f });
+  }
+  renderStatic(L);
+}
+
+function startLevel(i) {
+  Sound.init();
+  game.level = i; buildLevel(i);
+  const L = LEVELS[i];
+  game.time = 0; game.alarms = 0; game.alarmT = 0; game.fishGot = 0; game.rings = []; game.particles = []; game.banner = 3.2; game.shake = 0;
+  game.cat = { x: (L.cat[0] + 0.5) * T, y: (L.cat[1] + 0.5) * T, ang: 0, t: 0, moving: false, sneak: false, hidden: false, stepT: 0 };
+  const wp0 = L.owner.wps[0];
+  game.owner = {
+    x: (wp0[0] + 0.5) * T, y: (wp0[1] + 0.5) * T, ang: Math.PI / 2, t: 0, moving: false, state: 'patrol', wp: 1, path: [],
+    speedMul: L.owner.speed, wait: 0, meter: 0, lookT: 0, baseAng: 0, target: null, repath: 0, lostT: 0, alertT: 0, hearCd: 0, react: 0, bubble: '',
+  };
+  pathOwnerTo(L.owner.wps[1]);
+  game.cams = L.cams.map(c => ({ ...c, px: c.x * T, py: c.y * T, ang: c.a, tt: Math.random() * 6, meter: 0, cool: 0, beepT: 0 }));
+  game.lasers = L.lasers.map(l => ({ ...l, dOn: l.on, dOff: l.off, ax: l.x1 * T, ay: l.y1 * T, bx: l.x2 * T, by: l.y2 * T, on: false, cool: 0, wasOn: false }));
+  game.fish = L.fish.map(f => ({ x: (f[0] + 0.5) * T, y: (f[1] + 0.5) * T, got: false, ph: Math.random() * 6 }));
+  game.fishTotal = game.fish.length;
+  game.state = 'playing';
+  hideOverlay(); buildBells(); Sound.meow();
+}
+
+// ================= ÇARPIŞMA & GÖRÜŞ =================
+function boxBlocked(x, y, r, g) {
+  const c0 = Math.floor((x - r) / T), c1 = Math.floor((x + r) / T), r0 = Math.floor((y - r) / T), r1 = Math.floor((y + r) / T);
+  for (let rr_ = r0; rr_ <= r1; rr_++) for (let c = c0; c <= c1; c++) {
+    if (rr_ < 0 || rr_ >= ROWS || c < 0 || c >= COLS) return true;
+    if (g[rr_][c]) return true;
+  }
+  return false;
+}
+function visAt(x, y) { const c = Math.floor(x / T), r = Math.floor(y / T); if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return true; return visBlock[r][c]; }
+function los(x0, y0, x1, y1) {
+  const d = dist(x0, y0, x1, y1), n = Math.ceil(d / 5);
+  for (let i = 1; i < n; i++) { const t = i / n; if (visAt(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)) return false; }
+  return true;
+}
+function castRay(x, y, a, range) {
+  const dx = Math.cos(a), dy = Math.sin(a);
+  for (let d = 4; d < range; d += 4) if (visAt(x + dx * d, y + dy * d)) return d;
+  return range;
+}
+function inCone(x, y, ang, fov, range, tx, ty) {
+  const d = dist(x, y, tx, ty); if (d > range) return false;
+  if (Math.abs(angDiff(ang, Math.atan2(ty - y, tx - x))) > fov / 2) return false;
+  return los(x, y, tx, ty);
+}
+
+// ================= YOL BULMA (BFS) =================
+function nearestFree(c, r) {
+  if (!ownerBlock[r]?.[c] && r >= 0 && c >= 0) return [c, r];
+  const seen = new Set([c + ',' + r]), q = [[c, r]];
+  while (q.length) {
+    const [x, y] = q.shift();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || seen.has(k)) continue;
+      if (!ownerBlock[ny][nx]) return [nx, ny];
+      seen.add(k); q.push([nx, ny]);
+    }
+  }
+  return [c, r];
+}
+function findPath(sc, sr, tc, tr) {
+  [tc, tr] = nearestFree(tc, tr);
+  const prev = new Map(), key = (c, r) => r * COLS + c, start = key(sc, sr), goal = key(tc, tr);
+  const q = [[sc, sr]]; prev.set(start, -1);
+  while (q.length) {
+    const [c, r] = q.shift(); if (key(c, r) === goal) break;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dx, nr = r + dy; if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+      const k = key(nc, nr); if (prev.has(k) || ownerBlock[nr][nc]) continue;
+      prev.set(k, key(c, r)); q.push([nc, nr]);
+    }
+  }
+  if (!prev.has(goal)) return [];
+  const path = []; let k = goal;
+  while (k !== start && k !== -1) { path.push([(k % COLS + 0.5) * T, (Math.floor(k / COLS) + 0.5) * T]); k = prev.get(k); }
+  return path.reverse();
+}
+function walkLine(x0, y0, x1, y1) {
+  const d = dist(x0, y0, x1, y1), n = Math.ceil(d / 6);
+  for (let i = 1; i <= n; i++) { const t = i / n; if (boxBlocked(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, OWNER_R, ownerBlock)) return false; }
+  return true;
+}
+function pathOwnerTo(tile) {
+  const o = game.owner;
+  o.path = findPath(Math.floor(o.x / T), Math.floor(o.y / T), tile[0], tile[1]);
+}
+function pathOwnerToPx(x, y) { pathOwnerTo([Math.floor(x / T), Math.floor(y / T)]); }
+
+// ================= GÜNCELLEME =================
+function update(dt) {
+  if (game.state !== 'playing') { game.banner = Math.max(0, game.banner - dt); return; }
+  game.time += dt; game.banner = Math.max(0, game.banner - dt); game.shake = Math.max(0, game.shake - dt);
+  updateCat(dt); updateFish(dt); updateLasers(dt); updateCams(dt); updateOwner(dt);
+  if (game.alarmT > 0) {
+    game.alarmT -= dt; game.sirenT -= dt;
+    if (game.sirenT <= 0) { game.sirenT = 0.25; game.sirenHi = !game.sirenHi; Sound.siren(game.sirenHi); }
+  }
+  for (const r of game.rings) r.t += dt; game.rings = game.rings.filter(r => r.t < 0.7);
+  for (const p of game.particles) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * dt; }
+  game.particles = game.particles.filter(p => p.t < p.life);
+  const c = game.cat, tc = tileAt(Math.floor(c.x / T), Math.floor(c.y / T));
+  if (tc === 'E' && game.state === 'playing') winLevel();
+}
+
+function updateCat(dt) {
+  const c = game.cat, inp = inputVec();
+  c.sneak = inp.sneak; c.t += dt;
+  const sp = c.sneak ? SNEAK_SPEED : CAT_SPEED;
+  c.moving = Math.hypot(inp.x, inp.y) > 0.1;
+  if (c.moving) {
+    const nx = c.x + inp.x * sp * dt; if (!boxBlocked(nx, c.y, CAT_R, catBlock)) c.x = nx;
+    const ny = c.y + inp.y * sp * dt; if (!boxBlocked(c.x, ny, CAT_R, catBlock)) c.y = ny;
+    const ta = Math.atan2(inp.y, inp.x); c.ang += angDiff(c.ang, ta) * Math.min(1, dt * 14);
+    c.stepT -= dt;
+    if (c.stepT <= 0) {
+      c.stepT = c.sneak ? 0.45 : 0.28;
+      if (!c.sneak) {
+        Sound.step(); game.rings.push({ x: c.x, y: c.y, t: 0 });
+        const o = game.owner;
+        if (dist(o.x, o.y, c.x, c.y) < NOISE_R) ownerHear(c.x, c.y);
+      }
+    }
+  }
+  c.hidden = hideRects.some(h => c.x > h.x + 3 && c.x < h.x + h.w - 3 && c.y > h.y + 3 && c.y < h.y + h.h - 3);
+}
+
+function updateFish() {
+  const c = game.cat;
+  for (const f of game.fish) if (!f.got && dist(f.x, f.y, c.x, c.y) < 18) {
+    f.got = true; game.fishGot++; Sound.fish();
+    for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, s = 40 + Math.random() * 60; game.particles.push({ x: f.x, y: f.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, t: 0, life: 0.6, col: i % 2 ? '#ffd166' : '#8fd3ff' }); }
+  }
+}
+
+function laserOn(l, t) { const per = l.dOn + l.dOff, p = ((t + l.phase) % per + per) % per; return p < l.dOn; }
+function updateLasers(dt) {
+  const c = game.cat;
+  for (const l of game.lasers) {
+    l.cool = Math.max(0, l.cool - dt);
+    l.on = laserOn(l, game.time) && l.cool <= 0;
+    if (l.on && !l.wasOn) Sound.tone(1200, 0.05, { type: 'square', vol: 0.03 });
+    l.wasOn = l.on;
+    if (l.on && segPointDist(c.x, c.y, l.ax, l.ay, l.bx, l.by) < CAT_R - 1) {
+      Sound.zap(); l.cool = 2.5; triggerAlarm(c.x, c.y, 'Lazere dokundun');
+    }
+  }
+}
+
+function updateCams(dt) {
+  const c = game.cat;
+  for (const cam of game.cams) {
+    cam.tt += dt * cam.speed;
+    // uçlarda kısa bekleme hissi için yumuşatılmış salınım
+    const s = Math.sin(cam.tt); cam.ang = cam.a + Math.sign(s) * Math.pow(Math.abs(s), 0.7) * cam.sweep;
+    cam.cool = Math.max(0, cam.cool - dt);
+    const sees = cam.cool <= 0 && !c.hidden && inCone(cam.px, cam.py, cam.ang, cam.fov, cam.range * T, c.x, c.y);
+    cam.sees = sees;
+    if (sees) {
+      cam.meter += dt * 1.6;
+      cam.beepT -= dt; if (cam.beepT <= 0) { cam.beepT = 0.22 - cam.meter * 0.12; Sound.beep(cam.meter); }
+      if (cam.meter >= 1) { cam.meter = 0; cam.cool = 3; triggerAlarm(c.x, c.y, 'Kamera seni gördü'); }
+    } else cam.meter = Math.max(0, cam.meter - dt * 0.35);
+  }
+}
+
+function triggerAlarm(x, y, why) {
+  if (game.state !== 'playing') return;
+  if (game.alarmT <= 0) {
+    game.alarms++; buildBells(); game.shake = 0.4;
+    if (game.alarms >= MAX_ALARMS) { game.alarmT = 2; loseGame('Alarm ' + MAX_ALARMS + ' kez çaldı ve sahibin tamamen uyandı.'); return; }
+  }
+  game.alarmT = 5; game.alarmWhy = why;
+  const o = game.owner;
+  o.state = 'investigate'; o.target = { x, y }; o.alertT = 8; o.bubble = '!'; o.react = 0.3; pathOwnerToPx(x, y);
+  Sound.huh();
+}
+
+function ownerHear(x, y) {
+  const o = game.owner;
+  if (o.state === 'chase' || o.hearCd > 0) return;
+  o.hearCd = 1.2;
+  o.state = 'investigate'; o.target = { x, y }; o.bubble = '?'; o.react = 0.6;
+  pathOwnerToPx(x, y); Sound.huh();
+}
+
+function updateOwner(dt) {
+  const o = game.owner, c = game.cat, L = LEVELS[game.level];
+  o.t += dt; o.hearCd = Math.max(0, o.hearCd - dt); o.alertT = Math.max(0, o.alertT - dt);
+  const alert = o.alertT > 0 || o.state === 'chase';
+  const range = (alert ? 6.5 : 5.2) * T, fov = alert ? 1.5 : 1.3;
+  const d = dist(o.x, o.y, c.x, c.y);
+  let sees = false;
+  if (c.hidden) sees = d < 34 && inCone(o.x, o.y, o.ang, fov, range, c.x, c.y);
+  else sees = inCone(o.x, o.y, o.ang, fov, range, c.x, c.y) || d < 26;
+  o.sees = sees;
+  if (sees) {
+    o.meter += dt * (1.0 + 2.4 * (1 - d / range)) * (c.sneak ? 0.85 : 1);
+    o.lastSeen = { x: c.x, y: c.y }; o.lostT = 0;
+    if (o.meter >= 1 || (d < 22 && !c.hidden)) { loseGame('Sahibin seni yakaladı. Kucağa alındın ve kaçış bitti.'); return; }
+    if (o.meter > 0.45 && o.state !== 'chase') { o.state = 'chase'; o.bubble = '!'; o.repath = 0; Sound.huh(); }
+  } else {
+    o.meter = Math.max(0, o.meter - dt * 0.4);
+  }
+  let speed = 70 * o.speedMul, wantAng = null;
+  if (o.react > 0) { // sesi duydu: durup dön
+    o.react -= dt; o.moving = false;
+    if (o.target) wantAng = Math.atan2(o.target.y - o.y, o.target.x - o.x);
+  } else if (sees && o.state !== 'chase') { // şüpheli bakış
+    o.moving = false; wantAng = Math.atan2(c.y - o.y, c.x - o.x); o.bubble = '?';
+  } else {
+    if (o.state === 'chase') {
+      speed = 135 * o.speedMul;
+      o.repath -= dt;
+      if (!sees) o.lostT += dt;
+      if (o.repath <= 0) { o.repath = 0.25; const tg = sees ? c : o.lastSeen; pathOwnerToPx(tg.x, tg.y); }
+      if (o.lostT > 0.6) { o.state = 'investigate'; o.target = o.lastSeen; o.bubble = '?'; pathOwnerToPx(o.target.x, o.target.y); }
+    } else if (o.state === 'investigate') {
+      speed = (o.alertT > 0 ? 115 : 92) * o.speedMul;
+      if (!o.path.length) { o.state = 'look'; o.lookT = 0; o.baseAng = o.ang; }
+    } else if (o.state === 'look') {
+      o.lookT += dt; o.moving = false;
+      o.ang = o.baseAng + Math.sin(o.lookT * 2.2) * 1.3;
+      if (o.lookT > 2.8) { o.state = 'patrol'; o.bubble = ''; pathOwnerTo(L.owner.wps[o.wp]); }
+    } else if (o.state === 'patrol') {
+      if (!o.path.length) {
+        if (o.wait <= 0) { o.wait = 1.4; o.baseAng = o.ang; }
+        o.wait -= dt; o.moving = false; o.ang = o.baseAng + Math.sin((1.4 - o.wait) * 3) * 0.9;
+        if (o.wait <= 0) { o.wp = (o.wp + 1) % L.owner.wps.length; pathOwnerTo(L.owner.wps[o.wp]); }
+      }
+    }
+    if (o.state !== 'look' && o.path.length) {
+      while (o.path.length > 1 && walkLine(o.x, o.y, o.path[1][0], o.path[1][1])) o.path.shift();
+      const [tx, ty] = o.path[0], dd = dist(o.x, o.y, tx, ty);
+      if (dd < 3) o.path.shift();
+      else {
+        const step = Math.min(dd, speed * dt);
+        o.x += (tx - o.x) / dd * step; o.y += (ty - o.y) / dd * step; o.moving = true;
+        wantAng = Math.atan2(ty - o.y, tx - o.x);
+      }
+    } else if (o.state !== 'look' && o.state !== 'patrol') o.moving = false;
+  }
+  if (wantAng !== null) o.ang += angDiff(o.ang, wantAng) * Math.min(1, dt * 6);
+}
+
+// ================= OYUN AKIŞI =================
+function starsFor() { return 1 + (game.alarms === 0 ? 1 : 0) + (game.fishGot === game.fishTotal ? 1 : 0); }
+function fmtTime(t) { const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); }
+function starHTML(n) { let s = ''; for (let i = 0; i < 3; i++) s += i < n ? '<span class="s">★</span>' : '★'; return s; }
+
+function winLevel() {
+  game.state = 'levelwin'; Sound.win(); Sound.meow();
+  const st = starsFor(); game.totalStars[game.level] = Math.max(game.totalStars[game.level], st);
+  const last = game.level === LEVELS.length - 1;
+  const stats = `<div class="stats"><div><small>Süre</small><b>${fmtTime(game.time)}</b></div><div><small>Balık</small><b>${game.fishGot}/${game.fishTotal}</b></div><div><small>Alarm</small><b>${game.alarms}</b></div></div>`;
+  if (last) {
+    const total = game.totalStars.reduce((a, b) => a + b, 0);
+    showOverlay(`<div class="card"><canvas id="menuCat" width="200" height="110"></canvas><h1>Özgürsün</h1>
+      <p class="lead">Kedi kapısından süzüldün ve bahçeye çıktın. Ev artık arkanda kaldı.</p>
+      <div class="stars">${starHTML(st)}</div>${stats}<p>Toplam yıldız: <b style="color:#ffd166">${total} / 9</b></p>
+      <div class="btns"><button data-primary onclick="startLevel(0)">Baştan Oyna</button><button class="ghost" onclick="showMenu()">Ana Menü</button></div></div>`);
+    drawMenuCat(true);
+  } else {
+    showOverlay(`<div class="card"><h2>Bölüm Geçildi</h2><p class="lead">${LEVELS[game.level].name} bitti. Sıradaki: <b>${LEVELS[game.level + 1].name}</b></p>
+      <div class="stars">${starHTML(st)}</div>${stats}
+      <p style="font-size:13px">Yıldızlar: bitirmek, hiç alarm çaldırmamak, tüm balıkları toplamak.</p>
+      <div class="btns"><button data-primary onclick="startLevel(${game.level + 1})">Sonraki Bölüm</button><button class="ghost" onclick="startLevel(${game.level})">Tekrar Oyna</button></div></div>`);
+  }
+}
+function loseGame(reason) {
+  if (game.state !== 'playing') return;
+  game.state = 'lose'; game.shake = 0.5; Sound.lose();
+  setTimeout(() => {
+    showOverlay(`<div class="card"><h2 style="color:var(--danger)">Yakalandın</h2><p class="lead">${reason}</p>
+      <p>İpucu: Shift ile sinsi yürü, mobilyaların altına saklan ve kameraların dönüşünü bekle.</p>
+      <div class="btns"><button data-primary onclick="startLevel(${game.level})">Tekrar Dene (R)</button><button class="ghost" onclick="showMenu()">Ana Menü</button></div></div>`);
+  }, 900);
+}
+function pauseGame() {
+  game.state = 'paused';
+  showOverlay(`<div class="card"><h2>Duraklatıldı</h2><p>Kedi pusuda bekliyor.</p>
+    <div class="btns"><button data-primary onclick="resumeGame()">Devam Et</button><button class="ghost" onclick="startLevel(game.level)">Bölümü Yeniden Başlat</button><button class="ghost" onclick="showMenu()">Ana Menü</button></div></div>`);
+}
+function resumeGame() { game.state = 'playing'; hideOverlay(); }
+function showMenu() {
+  game.state = 'menu'; buildLevel(0); game.cat = null;
+  const lv = LEVELS.map((l, i) => `<button class="ghost" onclick="startLevel(${i})">${i + 1}. ${l.name}</button>`).join('');
+  showOverlay(`<div class="card"><canvas id="menuCat" width="200" height="110"></canvas><h1>Pati Firarı</h1>
+    <p class="lead">Sen evin kedisisin ve özgürlüğe kaçmak istiyorsun. Kameralara görünme, alarmları çaldırma, sahibine yakalanma.</p>
+    <div class="rules">
+      <b>WASD / Oklar</b><span>Hareket et</span>
+      <b>Shift (basılı)</b><span>Sinsi yürü: yavaş ama sessiz. Koşarken çıkan sesi sahibin duyar.</span>
+      <b>Mobilyalar</b><span>Yatak, kanepe ve masaların altına girersen saklanırsın.</span>
+      <b>Kameralar</b><span>Sarı ışığın içinde kalırsan alarm çalar. 3 alarm = oyun biter.</span>
+      <b>Lazerler</b><span>Kırmızıyken geçme, söndüğünde geç.</span>
+      <b>P / Esc · R · M</b><span>Duraklat · Yeniden başlat · Ses aç/kapat</span>
+    </div>
+    <div class="btns"><button data-primary onclick="startLevel(0)">Oyuna Başla</button></div>
+    <div class="btns" style="margin-top:10px">${lv}</div></div>`);
+  drawMenuCat(false);
+}
+function showOverlay(html) { overlay.innerHTML = html; overlay.classList.remove('hidden'); const b = overlay.querySelector('button[data-primary]'); if (b) b.focus({ preventScroll: true }); }
+function hideOverlay() { overlay.classList.add('hidden'); overlay.innerHTML = ''; canvas.focus?.(); }
+
+// ================= HUD =================
+const hLevel = document.getElementById('hLevel'), hFish = document.getElementById('hFish'), hBells = document.getElementById('hBells'), hTime = document.getElementById('hTime'), hMode = document.getElementById('mode'), hSound = document.getElementById('hSound');
+function buildBells() { hBells.innerHTML = ''; for (let i = 0; i < MAX_ALARMS; i++) { const b = document.createElement('div'); b.className = 'bell' + (i < game.alarms ? ' on' : ''); hBells.appendChild(b); } }
+function updateSoundLabel() { hSound.textContent = 'Ses: ' + (Sound.muted ? 'Kapalı' : 'Açık') + ' (M)'; }
+let lastHud = '';
+function updateHUD() {
+  const sneak = game.cat ? game.cat.sneak : false;
+  const s = `${game.level}|${game.fishGot}|${Math.floor(game.time)}|${sneak}|${game.cat?.hidden}`;
+  if (s === lastHud) return; lastHud = s;
+  hLevel.textContent = (game.level + 1) + ' · ' + LEVELS[game.level].name;
+  hFish.textContent = game.fishGot + '/' + game.fishTotal;
+  hTime.textContent = fmtTime(game.time);
+  hMode.textContent = game.cat?.hidden ? 'Saklanıyor' : sneak ? 'Sinsi' : 'Normal';
+  hMode.className = 'hud-val' + (sneak || game.cat?.hidden ? ' sneak' : '');
+}
+
+// ================= ÇİZİM: STATİK KATMAN =================
+const RS = 2;
+function renderStatic(L) {
+  staticLayer = document.createElement('canvas'); staticLayer.width = W * RS; staticLayer.height = H * RS;
+  hideLayer = document.createElement('canvas'); hideLayer.width = W * RS; hideLayer.height = H * RS;
+  const g = staticLayer.getContext('2d'); g.scale(RS, RS);
+  const rand = rng(1234 + game.level * 77);
+  // zemin
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const ch = grid[r][c], x = c * T, y = r * T;
+    if (ch === '.' || ch === 'E') {
+      g.fillStyle = L.wood; g.fillRect(x, y, T, T);
+      for (let k = 0; k < 4; k++) {
+        const sh = rand() * 0.14 - 0.07;
+        g.fillStyle = sh > 0 ? `rgba(255,230,190,${sh})` : `rgba(40,20,5,${-sh})`; g.fillRect(x, y + k * 8, T, 8);
+        g.fillStyle = 'rgba(40,20,5,.35)'; g.fillRect(x, y + k * 8 + 7.3, T, 0.7);
+        const seam = ((r * 4 + k) * 13 % 32); g.fillRect(x + seam, y + k * 8, 0.7, 8);
+      }
+    } else if (ch === ',') {
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { g.fillStyle = L.tile[(i + j + r + c) % 2]; g.fillRect(x + i * 16, y + j * 16, 16, 16); }
+      g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x, y, T, 0.8); g.fillRect(x, y + 16, T, 0.8); g.fillRect(x, y, 0.8, T); g.fillRect(x + 16, y, 0.8, T);
+    } else if (ch === '_') {
+      g.fillStyle = L.carpet; g.fillRect(x, y, T, T);
+      for (let k = 0; k < 14; k++) { g.fillStyle = rand() < 0.5 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.08)'; g.fillRect(x + rand() * T, y + rand() * T, 1.5, 1.5); }
+    }
+  }
+  // duvar gölgeleri
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (grid[r][c] === '#') continue; const x = c * T, y = r * T;
+    if (tileAt(c, r - 1) === '#') { const gr = g.createLinearGradient(0, y, 0, y + 10); gr.addColorStop(0, 'rgba(0,0,0,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x, y, T, 10); }
+    if (tileAt(c - 1, r) === '#') { const gr = g.createLinearGradient(x, 0, x + 8, 0); gr.addColorStop(0, 'rgba(0,0,0,.25)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x, y, 8, T); }
+  }
+  // dekor + sabit mobilyalar
+  for (const f of L.furniture) if (FTYPE[f.t] === 'decor') drawFurniture(g, f);
+  for (const f of L.furniture) if (FTYPE[f.t] === 'low' || FTYPE[f.t] === 'tall') drawFurniture(g, f);
+  // duvarlar
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (grid[r][c] !== '#') continue; const x = c * T, y = r * T;
+    g.fillStyle = '#2c2633'; g.fillRect(x, y, T, T);
+    g.fillStyle = '#4b4155';
+    if (tileAt(c, r + 1) !== '#') g.fillRect(x, y + T - 5, T, 5);
+    if (tileAt(c, r - 1) !== '#') g.fillRect(x, y, T, 3);
+    if (tileAt(c - 1, r) !== '#') g.fillRect(x, y, 3, T);
+    if (tileAt(c + 1, r) !== '#') g.fillRect(x + T - 3, y, 3, T);
+  }
+  // gece karanlığı
+  g.fillStyle = 'rgba(18,12,40,.22)'; g.fillRect(0, 0, W, H);
+  const hg = hideLayer.getContext('2d'); hg.scale(RS, RS);
+  for (const f of L.furniture) if (FTYPE[f.t] === 'hide') drawFurniture(hg, f);
+  hg.globalCompositeOperation = 'source-atop'; hg.fillStyle = 'rgba(18,12,40,.22)'; hg.fillRect(0, 0, W, H);
+  // vinyet
+  vignette = document.createElement('canvas'); vignette.width = W; vignette.height = H;
+  const vg = vignette.getContext('2d'), grd = vg.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.65);
+  grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(5,3,15,.5)'); vg.fillStyle = grd; vg.fillRect(0, 0, W, H);
+}
+
+function drawFurniture(g, f) {
+  const x = f.x * T, y = f.y * T, w = f.w * T, h = f.h * T;
+  g.save();
+  const shadow = () => { g.fillStyle = 'rgba(0,0,0,.28)'; rr(g, x + 3, y + 4, w - 2, h - 2, 6); g.fill(); };
+  switch (f.t) {
+    case 'rug': {
+      g.fillStyle = '#8c3b3b'; rr(g, x + 4, y + 4, w - 8, h - 8, 4); g.fill();
+      g.strokeStyle = '#e3b66b'; g.lineWidth = 2; rr(g, x + 9, y + 9, w - 18, h - 18, 3); g.stroke();
+      g.strokeStyle = 'rgba(227,182,107,.5)'; g.lineWidth = 1;
+      for (let i = 1; i < 4; i++) { g.beginPath(); g.ellipse(x + w / 2, y + h / 2, (w - 30) / 2 * i / 4, (h - 30) / 2 * i / 4, 0, 0, 7); g.stroke(); }
+      break;
+    }
+    case 'bed': {
+      shadow();
+      g.fillStyle = '#6b4a30'; rr(g, x + 2, y + 2, w - 4, h - 4, 6); g.fill();
+      g.fillStyle = '#efe8dc'; rr(g, x + 5, y + 5, w - 10, h - 10, 5); g.fill();
+      g.fillStyle = '#5d7fb0'; rr(g, x + 5, y + h * 0.38, w - 10, h * 0.62 - 5, 5); g.fill();
+      g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2;
+      for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(x + 6, y + h * 0.38 + i * (h * 0.15)); g.lineTo(x + w - 6, y + h * 0.38 + i * (h * 0.15)); g.stroke(); }
+      g.fillStyle = '#fffaf0';
+      if (w > 2.5 * T) { rr(g, x + 9, y + 9, w / 2 - 14, h * 0.2, 6); g.fill(); rr(g, x + w / 2 + 5, y + 9, w / 2 - 14, h * 0.2, 6); g.fill(); }
+      else { rr(g, x + 9, y + 9, w - 18, h * 0.2, 6); g.fill(); }
+      break;
+    }
+    case 'sofa': case 'armchair': {
+      shadow();
+      const col = f.t === 'sofa' ? '#3f7d78' : '#9a5b7a';
+      g.fillStyle = col; rr(g, x + 2, y + 2, w - 4, h - 4, 8); g.fill();
+      g.fillStyle = 'rgba(0,0,0,.18)';
+      const vertical = h > w;
+      if (vertical) { rr(g, x + 2, y + 2, 9, h - 4, 6); g.fill(); }
+      else { rr(g, x + 2, y + 2, w - 4, 10, 6); g.fill(); }
+      g.fillStyle = 'rgba(255,255,255,.12)';
+      if (vertical) { const n = Math.round(h / T); for (let i = 0; i < n; i++) { rr(g, x + 13, y + 5 + i * (h - 10) / n, w - 18, (h - 10) / n - 3, 5); g.fill(); } }
+      else { const n = Math.max(1, Math.round(w / T / 1.5)); for (let i = 0; i < n; i++) { rr(g, x + 7 + i * (w - 14) / n, y + 14, (w - 14) / n - 3, h - 20, 5); g.fill(); } }
+      break;
+    }
+    case 'table': case 'desk': case 'bench': {
+      shadow();
+      g.fillStyle = f.t === 'bench' ? '#7b5537' : '#8a5f3b'; rr(g, x + 3, y + 3, w - 6, h - 6, 5); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1;
+      for (let i = 1; i < 5; i++) { g.beginPath(); g.moveTo(x + 6, y + 3 + i * (h - 6) / 5); g.lineTo(x + w - 6, y + 3 + i * (h - 6) / 5); g.stroke(); }
+      if (f.t === 'desk') {
+        g.fillStyle = '#2b2f36'; rr(g, x + w * 0.35, y + 8, 30, 20, 3); g.fill(); g.fillStyle = '#6fb6ff'; g.fillRect(x + w * 0.35 + 3, y + 11, 24, 14);
+        g.fillStyle = '#f2efe6'; g.save(); g.translate(x + 16, y + 18); g.rotate(-0.2); g.fillRect(-8, -10, 16, 20); g.restore();
+      } else if (f.t === 'table') {
+        g.fillStyle = '#f4f1ea'; g.beginPath(); g.arc(x + w / 2, y + h / 2, 7, 0, 7); g.fill();
+        g.fillStyle = '#d7704b'; g.beginPath(); g.arc(x + w / 2, y + h / 2, 3.5, 0, 7); g.fill();
+      }
+      break;
+    }
+    case 'basket': {
+      shadow();
+      g.fillStyle = '#c99b5a'; rr(g, x + 4, y + 4, w - 8, h - 8, 10); g.fill();
+      g.strokeStyle = 'rgba(90,60,20,.5)'; g.lineWidth = 1.5;
+      for (let i = 8; i < w - 6; i += 6) { g.beginPath(); g.moveTo(x + i, y + 6); g.lineTo(x + i, y + h - 6); g.stroke(); }
+      g.fillStyle = '#e66f6f'; g.beginPath(); g.ellipse(x + w * 0.4, y + h * 0.45, 12, 8, 0.4, 0, 7); g.fill();
+      g.fillStyle = '#7fb3e6'; g.beginPath(); g.ellipse(x + w * 0.6, y + h * 0.6, 11, 7, -0.3, 0, 7); g.fill();
+      break;
+    }
+    case 'wardrobe': case 'shelf': {
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, y + h - 2, w, 8);
+      g.fillStyle = '#4e3524'; g.fillRect(x, y, w, h);
+      g.fillStyle = '#654631'; g.fillRect(x + 2, y + 2, w - 4, h - 4);
+      if (f.t === 'shelf') {
+        const cols = ['#c0504d', '#4f81bd', '#9bbb59', '#f2c14e', '#8064a2', '#4bacc6'];
+        let bx = x + 4, i = 0; const rnd = rng(f.x * 31 + f.y);
+        while (bx < x + w - 6) { const bw = 3 + rnd() * 5; g.fillStyle = cols[i++ % cols.length]; g.fillRect(bx, y + 5, bw, h - 12); bx += bw + 1; }
+      } else {
+        g.strokeStyle = '#3a271a'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + w / 2, y + 3); g.lineTo(x + w / 2, y + h - 3); g.stroke();
+        g.fillStyle = '#d8b26a'; g.fillRect(x + w / 2 - 6, y + h / 2 - 3, 3, 6); g.fillRect(x + w / 2 + 3, y + h / 2 - 3, 3, 6);
+      }
+      break;
+    }
+    case 'fridge': {
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + 2, y + h - 2, w - 2, 8);
+      g.fillStyle = '#dfe5ea'; rr(g, x + 2, y + 1, w - 4, h - 2, 5); g.fill();
+      g.fillStyle = '#b9c2c9'; g.fillRect(x + 2, y + h * 0.4, w - 4, 2);
+      g.fillStyle = '#8b959d'; g.fillRect(x + w - 10, y + 8, 3, 14); g.fillRect(x + w - 10, y + h * 0.4 + 8, 3, 18);
+      g.fillStyle = '#ff7b7b'; g.beginPath(); g.arc(x + 14, y + 14, 3, 0, 7); g.fill();
+      break;
+    }
+    case 'counter': {
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, y + h - 2, w, 7);
+      g.fillStyle = '#8d939a'; g.fillRect(x, y, w, h); g.fillStyle = '#a9afb5'; g.fillRect(x + 1, y + 1, w - 2, h - 6);
+      // ocak
+      g.fillStyle = '#2f3338'; g.fillRect(x + 8, y + 4, 44, 22);
+      g.strokeStyle = '#d0533c'; g.lineWidth = 2; [[18, 10], [40, 10], [18, 20], [40, 20]].forEach(([a, b]) => { g.beginPath(); g.arc(x + a, y + b, 4, 0, 7); g.stroke(); });
+      // evye
+      g.fillStyle = '#d7dde2'; rr(g, x + w - 70, y + 4, 40, 22, 4); g.fill(); g.fillStyle = '#9fb3c2'; rr(g, x + w - 66, y + 7, 32, 16, 3); g.fill();
+      break;
+    }
+    case 'washer': {
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + 2, y + h - 2, w - 4, 7);
+      g.fillStyle = '#eef1f3'; rr(g, x + 3, y + 1, w - 6, h - 2, 4); g.fill();
+      g.fillStyle = '#9aa7b0'; g.beginPath(); g.arc(x + w / 2, y + h / 2 + 1, 10, 0, 7); g.fill();
+      g.fillStyle = '#5d87a8'; g.beginPath(); g.arc(x + w / 2, y + h / 2 + 1, 7, 0, 7); g.fill();
+      break;
+    }
+    case 'plant': {
+      g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x + 17, y + 19, 12, 10, 0, 0, 7); g.fill();
+      g.fillStyle = '#b5653d'; g.beginPath(); g.arc(x + 16, y + 16, 10, 0, 7); g.fill();
+      g.fillStyle = '#5b3a24'; g.beginPath(); g.arc(x + 16, y + 16, 7.5, 0, 7); g.fill();
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * Math.PI * 2; g.fillStyle = i % 2 ? '#4f9a57' : '#3f7f48';
+        g.beginPath(); g.ellipse(x + 16 + Math.cos(a) * 7, y + 16 + Math.sin(a) * 7, 8, 4, a, 0, 7); g.fill();
+      }
+      break;
+    }
+    case 'tub': {
+      shadow();
+      g.fillStyle = '#f4f6f8'; rr(g, x + 2, y + 2, w - 4, h - 4, 14); g.fill();
+      g.fillStyle = '#9fd1ea'; rr(g, x + 8, y + 8, w - 16, h - 16, 10); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.ellipse(x + w / 2 - 4, y + h / 3, 6, 3, 0, 0, 7); g.fill();
+      break;
+    }
+    case 'sink': {
+      shadow();
+      g.fillStyle = '#f4f6f8'; rr(g, x + 3, y + 2, w - 6, h - 6, 6); g.fill();
+      g.fillStyle = '#cfe3ee'; g.beginPath(); g.ellipse(x + w / 2, y + h / 2, 14, 8, 0, 0, 7); g.fill();
+      g.fillStyle = '#9aa'; g.fillRect(x + w / 2 - 1.5, y + 3, 3, 6);
+      break;
+    }
+  }
+  g.restore();
+}
+
+// ================= ÇİZİM: KARAKTERLER =================
+function drawCat(g, x, y, ang, t, moving, sneak, s = 1) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(s, s);
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(1, 2, 15, 9, 0, 0, 7); g.fill();
+  const sway = Math.sin(t * (moving ? 9 : 2.5));
+  g.lineCap = 'round';
+  g.strokeStyle = '#e0893a'; g.lineWidth = 4.5; g.beginPath(); g.moveTo(-9, 0); g.quadraticCurveTo(-17, sway * 9, -24, sway * 12 + 3); g.stroke();
+  g.strokeStyle = '#b8601d'; g.lineWidth = 4.5; g.beginPath(); g.moveTo(-21.5, sway * 11 + 2.4); g.lineTo(-24, sway * 12 + 3); g.stroke();
+  const st = moving ? Math.sin(t * (sneak ? 9 : 15)) * 3.2 : 0;
+  g.fillStyle = '#f6e2c4';
+  [[6 + st, -6], [6 - st, 6], [-6 - st, -6], [-6 + st, 6]].forEach(([a, b]) => { g.beginPath(); g.arc(a, b, 2.6, 0, 7); g.fill(); });
+  const rx = sneak ? 13 : 12, ry = sneak ? 6 : 7;
+  g.fillStyle = '#f0a04b'; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 7); g.fill();
+  g.strokeStyle = '#c46d24'; g.lineWidth = 1.8;
+  for (const sx of [-7, -3, 1, 5]) { g.beginPath(); g.moveTo(sx, -ry + 1); g.quadraticCurveTo(sx + 1.5, 0, sx, ry - 1); g.stroke(); }
+  // kafa
+  g.fillStyle = '#f0a04b'; g.beginPath(); g.arc(12, 0, 7, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(8, -4); g.lineTo(11, -11); g.lineTo(15, -5); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(8, 4); g.lineTo(11, 11); g.lineTo(15, 5); g.closePath(); g.fill();
+  g.fillStyle = '#f6a6a6'; g.beginPath(); g.moveTo(9.5, -5); g.lineTo(11, -9); g.lineTo(13.5, -5.5); g.fill(); g.beginPath(); g.moveTo(9.5, 5); g.lineTo(11, 9); g.lineTo(13.5, 5.5); g.fill();
+  g.strokeStyle = '#c46d24'; g.lineWidth = 1.3; g.beginPath(); g.moveTo(7, 0); g.lineTo(11, 0); g.stroke();
+  g.fillStyle = '#2d6b3a'; g.beginPath(); g.arc(15, -2.6, 1.6, 0, 7); g.arc(15, 2.6, 1.6, 0, 7); g.fill();
+  g.fillStyle = '#e57a8a'; g.beginPath(); g.arc(18.4, 0, 1.3, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 0.7;
+  for (const k of [-1, 1]) { g.beginPath(); g.moveTo(17, k * 1.5); g.lineTo(23, k * 4.5); g.moveTo(17, k * 1.5); g.lineTo(23.5, k * 1.8); g.stroke(); }
+  g.restore();
+}
+
+function drawOwner(g, o) {
+  g.save(); g.translate(o.x, o.y); g.rotate(o.ang);
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(1, 2, 17, 19, 0, 0, 7); g.fill();
+  const s = o.moving ? Math.sin(o.t * 9) * 5 : 0;
+  g.fillStyle = '#e48aa8'; rr(g, 3 + s, -10, 11, 6, 3); g.fill(); rr(g, 3 - s, 4, 11, 6, 3); g.fill();
+  g.fillStyle = '#41679c'; g.beginPath(); g.ellipse(0, 0, 9, 16, 0, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 2;
+  for (let i = -12; i <= 12; i += 6) { g.beginPath(); g.moveTo(-7, i); g.lineTo(7, i); g.stroke(); }
+  g.fillStyle = '#f1c7a0'; g.beginPath(); g.arc(3 - s * 0.6, -17, 3.5, 0, 7); g.arc(3 + s * 0.6, 17, 3.5, 0, 7); g.fill();
+  g.fillStyle = '#5b3a29'; g.beginPath(); g.arc(-1, 0, 8.5, 0, 7); g.fill();
+  g.fillStyle = '#f1c7a0'; g.beginPath(); g.ellipse(3, 0, 6, 7, 0, 0, 7); g.fill();
+  g.fillStyle = '#e2ad86'; g.beginPath(); g.arc(9, 0, 2, 0, 7); g.fill();
+  g.restore();
+  if (o.state === 'chase' || o.bubble) {
+    const txt = o.state === 'chase' ? '!' : o.bubble, bob = Math.sin(o.t * 6) * 2;
+    g.save(); g.translate(o.x, o.y - 32 + bob);
+    g.fillStyle = txt === '!' ? '#ff5a4f' : '#ffd166'; g.beginPath(); g.arc(0, 0, 10, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(-4, 8); g.lineTo(0, 15); g.lineTo(4, 8); g.fill();
+    g.fillStyle = '#1b1720'; g.font = 'bold 15px ' + getComputedStyle(document.body).fontFamily; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 0, 1);
+    g.restore();
+  }
+  if (o.meter > 0.02) meterArc(g, o.x, o.y, 24, o.meter, '#ff7a45');
+}
+
+function meterArc(g, x, y, r, v, col) {
+  g.save(); g.lineWidth = 4; g.lineCap = 'round';
+  g.strokeStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+  g.strokeStyle = col; g.beginPath(); g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + v * Math.PI * 2); g.stroke(); g.restore();
+}
+
+function drawCone(g, x, y, ang, fov, range, rgb, alpha) {
+  const n = Math.max(14, Math.ceil(fov * 34));
+  g.beginPath(); g.moveTo(x, y);
+  for (let i = 0; i <= n; i++) { const a = ang - fov / 2 + fov * i / n, d = castRay(x, y, a, range); g.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d); }
+  g.closePath();
+  const gr = g.createRadialGradient(x, y, 4, x, y, range);
+  gr.addColorStop(0, `rgba(${rgb},${alpha * 1.6})`); gr.addColorStop(1, `rgba(${rgb},${alpha * 0.35})`);
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = `rgba(${rgb},${Math.min(1, alpha * 2.4)})`; g.lineWidth = 1.2; g.stroke();
+}
+
+function drawCamera(g, cam, t) {
+  g.save(); g.translate(cam.px, cam.py);
+  g.fillStyle = '#1e1b22'; g.beginPath(); g.arc(0, 0, 6, 0, 7); g.fill();
+  g.rotate(cam.ang);
+  g.fillStyle = '#dcdce2'; rr(g, -6, -5, 14, 10, 3); g.fill();
+  g.fillStyle = '#2a2a30'; rr(g, 7, -4, 5, 8, 2); g.fill();
+  g.fillStyle = '#6fd0ff'; g.beginPath(); g.arc(10, -1, 1.2, 0, 7); g.fill();
+  const blink = cam.sees || cam.cool > 0 ? (Math.sin(t * 20) > 0) : (Math.sin(t * 3) > 0.6);
+  g.fillStyle = blink ? '#ff3b30' : '#5a1a18'; g.beginPath(); g.arc(-2, 0, 2, 0, 7); g.fill();
+  g.restore();
+  if (cam.meter > 0.02) meterArc(g, cam.px, cam.py, 13, cam.meter, '#ffcf4a');
+}
+
+function drawLaser(g, l, t) {
+  const em = (x, y) => { g.fillStyle = '#26222b'; rr(g, x - 5, y - 5, 10, 10, 2); g.fill(); g.fillStyle = l.on ? '#ff3b30' : '#6b2420'; g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); };
+  if (l.on) {
+    const fl = 0.75 + Math.sin(t * 40) * 0.15;
+    g.save(); g.lineCap = 'round';
+    g.strokeStyle = `rgba(255,40,40,${0.25 * fl})`; g.lineWidth = 9; g.beginPath(); g.moveTo(l.ax, l.ay); g.lineTo(l.bx, l.by); g.stroke();
+    g.strokeStyle = `rgba(255,90,80,${fl})`; g.lineWidth = 2.5; g.stroke();
+    g.strokeStyle = 'rgba(255,230,230,.9)'; g.lineWidth = 0.8; g.stroke();
+    g.restore();
+  } else {
+    const per = l.dOn + l.dOff, p = ((game.time + l.phase) % per + per) % per, remain = per - p;
+    g.save(); g.setLineDash([3, 6]);
+    const warn = remain < 0.45 && l.cool <= 0;
+    g.strokeStyle = warn ? `rgba(255,120,90,${0.4 + Math.sin(t * 30) * 0.3})` : 'rgba(255,120,90,.18)'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(l.ax, l.ay); g.lineTo(l.bx, l.by); g.stroke(); g.restore();
+  }
+  em(l.ax, l.ay); em(l.bx, l.by);
+}
+
+function drawFish(g, f, t) {
+  const bob = Math.sin(t * 3 + f.ph) * 2.5;
+  g.save(); g.translate(f.x, f.y + bob);
+  const gr = g.createRadialGradient(0, 0, 2, 0, 0, 16); gr.addColorStop(0, 'rgba(140,210,255,.45)'); gr.addColorStop(1, 'rgba(140,210,255,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 16, 0, 7); g.fill();
+  g.fillStyle = '#7cc4f2'; g.beginPath(); g.ellipse(0, 0, 8, 4.5, 0, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(-6, 0); g.lineTo(-12, -5); g.lineTo(-12, 5); g.closePath(); g.fill();
+  g.fillStyle = '#1b1720'; g.beginPath(); g.arc(4, -1, 1.2, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1; g.beginPath(); g.arc(-1, 0, 3, -1, 1); g.stroke();
+  g.restore();
+}
+
+function drawExit(g, t) {
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c] === 'E') {
+    const x = c * T, y = r * T, p = 0.5 + Math.sin(t * 3) * 0.25;
+    g.fillStyle = `rgba(127,214,140,${0.35 * p + 0.15})`; g.fillRect(x, y, T, T);
+  }
+  // etiket
+  let sx = 0, sy = 0, n = 0; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c] === 'E') { sx += c; sy += r; n++; }
+  if (!n) return; sx = (sx / n + 0.5) * T; sy = (sy / n + 0.5) * T;
+  let lx = sx, ly = sy;
+  if (sx > W - T * 1.5) lx -= 46; else if (sx < T * 1.5) lx += 46; if (sy > H - T * 1.5) ly -= 34;
+  g.save(); g.font = 'bold 12px ' + getComputedStyle(document.body).fontFamily; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const w = g.measureText('ÇIKIŞ').width + 14;
+  g.fillStyle = 'rgba(20,40,24,.85)'; rr(g, lx - w / 2, ly - 10, w, 20, 6); g.fill();
+  g.fillStyle = '#9ff0ad'; g.fillText('ÇIKIŞ', lx, ly + 1); g.restore();
+}
+
+// ================= ANA ÇİZİM =================
+function render() {
+  const t = performance.now() / 1000;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#1b1720'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let ox = 0, oy = 0; if (game.shake > 0) { ox = (Math.random() - .5) * 8 * game.shake; oy = (Math.random() - .5) * 8 * game.shake; }
+  ctx.setTransform(viewScale, 0, 0, viewScale, ox * viewScale, oy * viewScale);
+  if (!staticLayer) return;
+  ctx.drawImage(staticLayer, 0, 0, W, H);
+  if (game.state === 'menu' || !game.cat) { ctx.drawImage(hideLayer, 0, 0, W, H); ctx.drawImage(vignette, 0, 0); return; }
+  drawExit(ctx, t);
+  for (const f of game.fish) if (!f.got) drawFish(ctx, f, t);
+  for (const l of game.lasers) drawLaser(ctx, l, t);
+  for (const cam of game.cams) {
+    const alarmCol = cam.cool > 0 ? '255,60,50' : cam.sees ? '255,150,60' : '255,220,110';
+    drawCone(ctx, cam.px, cam.py, cam.ang, cam.fov, cam.range * T, alarmCol, cam.cool > 0 ? 0.16 : 0.12);
+  }
+  const o = game.owner, alert = o.alertT > 0 || o.state === 'chase';
+  drawCone(ctx, o.x, o.y, o.ang, alert ? 1.5 : 1.3, (alert ? 6.5 : 5.2) * T, o.sees ? '255,120,80' : alert ? '255,190,140' : '190,215,255', 0.1);
+  // ses halkaları
+  for (const r of game.rings) { ctx.strokeStyle = `rgba(255,255,255,${0.22 * (1 - r.t / 0.7)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(r.x, r.y, NOISE_R * (r.t / 0.7), 0, 7); ctx.stroke(); }
+  const c = game.cat;
+  drawCat(ctx, c.x, c.y, c.ang, c.t, c.moving, c.sneak);
+  // saklanma mobilyaları: kedi altındaysa yarı saydam
+  const under = c.hidden ? hideRects.find(h => c.x > h.x + 3 && c.x < h.x + h.w - 3 && c.y > h.y + 3 && c.y < h.y + h.h - 3) : null;
+  if (under) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(under.x, under.y, under.w, under.h); ctx.clip('evenodd');
+    ctx.drawImage(hideLayer, 0, 0, W, H); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.5;
+    ctx.drawImage(hideLayer, under.x * RS, under.y * RS, under.w * RS, under.h * RS, under.x, under.y, under.w, under.h); ctx.restore();
+    ctx.strokeStyle = 'rgba(127,214,140,.8)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; rr(ctx, under.x + 2, under.y + 2, under.w - 4, under.h - 4, 6); ctx.stroke(); ctx.setLineDash([]);
+  } else ctx.drawImage(hideLayer, 0, 0, W, H);
+  drawOwner(ctx, o);
+  for (const cam of game.cams) drawCamera(ctx, cam, t);
+  for (const p of game.particles) { ctx.globalAlpha = 1 - p.t / p.life; ctx.fillStyle = p.col; ctx.fillRect(p.x - 2, p.y - 2, 4, 4); } ctx.globalAlpha = 1;
+  ctx.drawImage(vignette, 0, 0);
+  // alarm efekti
+  if (game.alarmT > 0) {
+    const a = 0.18 + Math.sin(t * 12) * 0.12;
+    const gr = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, W * 0.7); gr.addColorStop(0, 'rgba(255,0,0,0)'); gr.addColorStop(1, `rgba(255,30,30,${a + 0.2})`);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.font = 'bold 26px ' + getComputedStyle(document.body).fontFamily; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(30,0,0,.6)'; rr(ctx, W / 2 - 170, 14, 340, 58, 12); ctx.fill();
+    ctx.fillStyle = '#ff6b5f'; ctx.fillText('ALARM ÇALIYOR', W / 2, 42);
+    ctx.font = '14px ' + getComputedStyle(document.body).fontFamily; ctx.fillStyle = '#ffd9d4'; ctx.fillText((game.alarmWhy || '') + ' · Hemen saklan', W / 2, 62);
+    ctx.restore();
+  }
+  // bölüm başlığı
+  if (game.banner > 0 && game.state === 'playing') {
+    const a = Math.min(1, game.banner / 0.6), L = LEVELS[game.level];
+    ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; const ff = getComputedStyle(document.body).fontFamily;
+    ctx.fillStyle = 'rgba(20,14,26,.82)'; rr(ctx, W / 2 - 260, H - 110, 520, 78, 14); ctx.fill();
+    ctx.font = 'bold 24px ' + ff; ctx.fillStyle = '#f0a04b'; ctx.fillText(`Bölüm ${game.level + 1}: ${L.name}`, W / 2, H - 76);
+    ctx.font = '15px ' + ff; ctx.fillStyle = '#f4eadb'; ctx.fillText(L.sub, W / 2, H - 50);
+    ctx.restore();
+  }
+  if (game.debug) { ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(6, 6, 170, 50); ctx.fillStyle = '#9f9'; ctx.font = '12px monospace'; ctx.fillText('FPS ' + game.fps.toFixed(0), 12, 22); ctx.fillText('Sahip: ' + o.state + ' ' + o.meter.toFixed(2), 12, 38); ctx.fillText('Kedi: ' + (c.x / T).toFixed(1) + ',' + (c.y / T).toFixed(1), 12, 52); }
+}
+
+function drawMenuCat(happy) {
+  const cv = document.getElementById('menuCat'); if (!cv) return;
+  const dpr = Math.min(2, devicePixelRatio || 1); cv.style.width = '200px'; cv.style.height = '110px'; cv.width = 200 * dpr; cv.height = 110 * dpr;
+  const g = cv.getContext('2d'); let t0 = performance.now();
+  (function loop() {
+    if (!document.body.contains(cv)) return;
+    const t = (performance.now() - t0) / 1000;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, 200, 110);
+    g.fillStyle = 'rgba(240,160,75,.12)'; g.beginPath(); g.ellipse(100, 60, 80, 40, 0, 0, 7); g.fill();
+    drawCat(g, 100 + Math.sin(t) * 20, 58, happy ? Math.sin(t * 2) * 0.3 : -0.25 + Math.sin(t * 0.8) * 0.2, t, true, false, 2.1);
+    requestAnimationFrame(loop);
+  })();
+}
+
+// ================= BOYUTLANDIRMA & DÖNGÜ =================
+function resize() {
+  const stage = document.getElementById('stage');
+  const aw = stage.clientWidth - 16, ah = stage.clientHeight - 16;
+  const s = Math.max(0.2, Math.min(aw / W, ah / H));
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width = Math.floor(W * s) + 'px'; canvas.style.height = Math.floor(H * s) + 'px';
+  canvas.width = Math.floor(W * s * dpr); canvas.height = Math.floor(H * s * dpr);
+  viewScale = canvas.width / W;
+}
+addEventListener('resize', resize);
+
+const STEP = 1 / 60; let acc = 0, last = performance.now(), fpsAcc = 0, fpsN = 0;
+function frame(now) {
+  let dt = (now - last) / 1000; last = now; if (dt > 0.25) dt = 0.25;
+  fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { game.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+  acc += dt;
+  while (acc >= STEP) { update(STEP); acc -= STEP; }
+  render(); if (game.cat) updateHUD();
+  requestAnimationFrame(frame);
+}
+
+// Test kancaları
+window.advanceTime = ms => { const n = Math.round(ms / (1000 / 60)); for (let i = 0; i < n; i++) update(STEP); render(); };
+window.render_game_to_text = () => JSON.stringify({
+  state: game.state, level: game.level, time: +game.time.toFixed(2), alarms: game.alarms, alarmRinging: game.alarmT > 0,
+  fish: `${game.fishGot}/${game.fishTotal}`,
+  cat: game.cat && { x: +(game.cat.x / T).toFixed(2), y: +(game.cat.y / T).toFixed(2), hidden: game.cat.hidden, sneak: game.cat.sneak },
+  owner: game.owner && { x: +(game.owner.x / T).toFixed(2), y: +(game.owner.y / T).toFixed(2), state: game.owner.state, meter: +game.owner.meter.toFixed(2) },
+  cams: game.cams.map(c => ({ meter: +c.meter.toFixed(2), sees: !!c.sees })), lasers: game.lasers.map(l => l.on),
+});
+window.game = game; window.startLevel = startLevel;
+
+buildBells(); updateSoundLabel(); resize(); showMenu();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
